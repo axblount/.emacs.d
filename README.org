@@ -1,0 +1,3 @@
+#+TITLE: My Emacs Config
+
+* oooooo i config it
