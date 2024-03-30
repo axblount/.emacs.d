@@ -3,13 +3,27 @@
 
 ;;; utf-8, everywhere, all the time
 (set-default-coding-systems 'utf-8)
+(set-terminal-coding-system 'utf-8)
 (prefer-coding-system 'utf-8)
 (set-language-environment "UTF-8")
+
+(setq warning-minimum-level :error)
 
 ;; no file of mine will have trailing whitespace
 (add-hook 'before-save-hook 'delete-trailing-whitespace)
 
-(set-frame-font "DejaVu Sans Mono 14" nil t)
+;; nicer visual bell
+(setq is-mode-line-flashing nil)
+(defun flash-mode-line ()
+  (unless is-mode-line-flashing
+    (setq is-mode-line-flashing t)
+    (invert-face 'mode-line)
+    (run-with-timer 0.1 nil #'invert-face 'mode-line)
+    (run-with-timer 0.2 nil #'invert-face 'mode-line)
+    (run-with-timer 0.3 nil (lambda ()
+			      (invert-face 'mode-line)
+			      (setq is-mode-line-flashing nil)))))
+(setq ring-bell-function 'flash-mode-line)
 
 ;; backups
 (setq backup-directory-alist
@@ -24,7 +38,7 @@
 (setq create-lockfiles nil)
 
 ;; customize ephemeral
-(setq custom-file (make-temp-file "emacs-custom"))
+(setq custom-file (locate-user-emacs-file "custom.el"))
 
 (setq indent-tabs-mode nil)
 
@@ -40,6 +54,7 @@
 (setq show-paren-style 'expression) ; highlight entire expression
 (show-paren-mode 1)
 
+(global-hl-line-mode 1)
 (electric-pair-mode 1) ; Insert closing )]}
 (transient-mark-mode 1) ; Modern text selection style
 (save-place-mode 1) ; Save last position in file
@@ -49,8 +64,15 @@
 (setq tab-always-indent 'complete)
 (add-to-list 'completion-styles 'initials t)
 
+;; soft wrap
 (setq visual-line-fringe-indicators '(left-curly-arrow right-curly-arrow))
 (add-hook 'text-mode-hook 'turn-on-visual-line-mode)
+
+;; don't ask to kill buffers with attached processes
+(setq kill-buffer-query-functions
+      (remq 'process-kill-buffer-query-function
+	    kill-buffer-query-functions))
+
 
 ;; Used to override :q in evil mode
 (defun write-and-quit-current-buffer ()
@@ -62,9 +84,13 @@
 ;;
 ;; Packaging
 ;;
+(add-to-list 'load-path
+	     (locate-user-emacs-file "lisp/"))
 (require 'package)
 (add-to-list 'package-archives
              '("melpa" . "https://melpa.org/packages/") t)
+(add-to-list 'package-archives
+	     '("org" . "https://orgmode.org/elpa/") t)
 (package-initialize)
 
 (unless (package-installed-p 'use-package)
@@ -90,9 +116,10 @@
         org-fontify-whole-heading-line t
         org-agenda-files '("~/notes/")))
 
-(use-package hyperbole
+(use-package geiser-guile
+  :after evil-collection
   :config
-  (hyperbole-mode))
+  (evil-collection-geiser-setup))
 
 ;;
 ;; Editing the Evil Way
@@ -142,9 +169,62 @@
   (evil-ex-define-cmd "git" #'magit-status))
 
 ;;
+;; Accounting
+;;
+;; (use-package ledger-mode
+;;   :init
+;;   (setq ledger-highlight-xact-under-point nil))
+
+;;
 ;; Aesthetics
 ;;
-;;(load-theme 'leuven t)
-(use-package solarized-theme
-  :config
-  (load-theme 'solarized-light t))
+;; (use-package moe-theme
+;;   :config
+;;   (setq moe-theme-modeline-color 'purple)
+;;   (moe-light))
+;; (use-package modus-themes
+;;   :init
+;;   (setq modus-themes-italic-constructs t
+;; 	modus-themes-bold-constructs t)
+;;   :config
+;;   (load-theme 'modus-operandi-tinted :no-confirm))
+
+;;
+;; Filetypes
+;;
+(when (version< emacs-version "29")
+  (use-package eglot))
+
+;;
+;; The End
+;;
+
+(defun random-choice (list)
+  (nth (random (length list)) list))
+
+(defvar barf-pejorative
+  (random-choice
+   '(loser
+     jerk
+     asshole
+     fucker
+     dipshit
+     knucklehead
+     babygirl
+     babyboy
+     sucker
+     goofball
+     ding-dong
+     bestie)))
+
+(setq initial-scratch-message
+      (format "\
+;; Emacs started on %s
+;; %d packages loaded in %s seconds
+;; Welcome to emacs %s, %s
+"
+	      (format-time-string "%A %B %-d at %H:%M:%S" (current-time))
+	      (length package-alist)
+	      (emacs-init-time)
+	      emacs-version
+	      barf-pejorative))
